@@ -10,6 +10,7 @@ from geometry_msgs.msg import Twist
 
 class rplidarnav:
     def __init__(self):
+        self.stop_flag = False
         rospy.init_node('rplidar_navigation', anonymous=True)
         rospy.Subscriber('/scan', LaserScan, self.callback)
         self.pub = rospy.Publisher('rp_nav', Twist, queue_size=1)
@@ -22,8 +23,11 @@ class rplidarnav:
         left_x = []  # 左侧x坐标
         left_y = []  # 左侧y坐标
         for i in range(480, 720):
+            #最近障碍物小于30cm，则停止
+            if msg.ranges[i] < 0.3:
+                self.stop_flag = True
             # 过滤断点，大于1则判定为不在一条车道线上
-            if msg.ranges[i] < 1:
+            if msg.ranges[i] < 1 and msg.ranges[i]>0.3:
                 current_dist = msg.ranges[i]
                 current_angle = (30 + (i - 480)//4)*math.pi//180 #弧度制
                 left_dist.append(current_dist)
@@ -45,7 +49,9 @@ class rplidarnav:
         right_x = []  # 右侧x坐标
         right_y = []  # 右侧y坐标
         for i in range(720, 960):
-            if msg.ranges[i] < 1:
+            if msg.ranges[i] < 0.3:
+                self.stop_flag = True
+            if msg.ranges[i] < 1 and msg.ranges[i]>0.3:
                 current_dist = msg.ranges[i]
                 current_angle = (30 + (960 - i)//4)*math.pi//180 #弧度制
                 right_dist.append(current_dist)
@@ -66,9 +72,17 @@ class rplidarnav:
         return expect_angle,x_offset
     def callback(self, msg):
         angle,offset = self.road_detection(msg)
-        twist = Twist()
-        twist.linear.x = 0.2
-        twist.angular.z = angle*1-offset
+        if self.stop_flag == False:
+            print('angle' + angle)
+            print('offset' + offset)
+            twist = Twist()
+            twist.linear.x = 0.2
+            twist.angular.z = angle * 1 - offset
+        if self.stop_flag == True:
+            print('detect obstacle,stop')
+            twist = Twist()
+            twist.linear.x = 0
+            twist.angular.z = 0
         self.pub.publish(twist)
 
 if __name__ == '__main__':
