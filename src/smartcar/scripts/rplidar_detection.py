@@ -4,6 +4,7 @@
 import rospy
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
@@ -15,6 +16,7 @@ class rplidarnav:
         rospy.Subscriber('/scan', LaserScan, self.callback)
         self.pub = rospy.Publisher('rp_nav', Twist, queue_size=1)
         print ('rplidar navigation is start')
+        plt.ion()
     def road_detection(self, msg):
         #扫描获取左侧雷达数据(左侧60度范围)
         #雷达正前方为720
@@ -43,6 +45,7 @@ class rplidarnav:
         b1 = z1[1]
         road_left_angle = math.atan(b1 / a1)
         x_left_base = -b1/a1
+        left_y_pred = a1 * left_x + b1
         # 扫描获取右侧雷达数据(右侧60度范围)
         right_dist = []  # 右侧激光距离数组
         right_angle = []  # 右侧激光角度数组
@@ -68,8 +71,16 @@ class rplidarnav:
         road_right_angle = math.atan(b2 / a2)
         expect_angle = (road_left_angle + road_right_angle)/2
         x_right_base = -b2/a2
+        right_y_pred = a2 * right_x + b2
         x_offset = x_left_base-x_right_base
+
+        plt.clf()
+        plt.plot(left_x, left_y_pred)
+        plt.plot(right_x, right_y_pred)
+        plt.axis('equal')
+        plt.show()
         return expect_angle,x_offset
+
     def callback(self, msg):
         angle,offset = self.road_detection(msg)
         if self.stop_flag == False:
