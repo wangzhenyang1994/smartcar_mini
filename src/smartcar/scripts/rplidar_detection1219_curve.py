@@ -27,7 +27,7 @@ class rplidarnav:
         last_left_dist = 0
         last_right_dist = 0
         for i in range(480, 720):
-            # 过滤断点，大于1则判定为不在一条车道线上
+            # 过滤断点，大于1.5则判定为不在一条车道线上
             if msg.ranges[i] < 1.5:
                 current_dist = msg.ranges[i]
                 if math.fabs(last_left_dist-current_dist)<=0.05:
@@ -43,23 +43,20 @@ class rplidarnav:
                     last_left_dist = current_dist
             else:
                 continue
-        z1 = np.polyfit(left_y, left_x, 1)  # 线性拟合
+        z1 = np.polyfit(left_y, left_x, 2)  # 二次拟合
         a1 = z1[0]
         b1 = z1[1]
-        road_left_angle = math.atan(-a1 / b1)
-        x_left_base = b1
+        c1 = z1[2]
         left_x_pred = []
+        x_left_base = c1
+        #计算对应y的x坐标 x=a1*y^2+b1*y+c1
         # for i in range (0,len(left_y),1):
-        #     left_x_pred.append(left_y[i]*a1+b1)
-        left_x_pred = np.array(left_y) * a1 + b1
-        #print('a1')
-        #print(a1)
-        #print('b1')
-        #print(b1)
-        #print('left_y')
-        #print(left_y)
-        #print ('left_x_pred')
-        #print left_x_pred
+        #     left_x_pred.append(a1*left_y[i]**2+b1*left_y[i]+c1)
+        left_y_np = np.array(left_y)
+        left_x_pred = a1*left_y_np**2 + b1*left_y_np + c1
+        #计算切线斜率和道路偏向角
+        #y_eval = np.max(left_y)
+        road_left_angle = math.atan(2 * a1 * c1 + b1)
         # 扫描获取右侧雷达数据(右侧60度范围)
         right_dist = []  # 右侧激光距离数组
         right_angle = []  # 右侧激光角度数组
@@ -82,21 +79,19 @@ class rplidarnav:
                     last_right_dist = current_dist
             else:
                 continue
-        z2 = np.polyfit(right_y, right_x, 1)  # 线性拟合
+        z2 = np.polyfit(right_y, right_x, 1)  # 二次拟合
         a2 = z2[0]
         b2 = z2[1]
-        road_right_angle = math.atan(-a2 / b2)
-        road_angle = (road_left_angle + road_right_angle)/2
-        expect_angle = road_angle -math.pi
-        x_right_base = b2
+        c2 = z2[2]
+        x_right_base = c2
         right_x_pred = []
         # for i in range (0,len(right_y),1):
-        #     right_x_pred.append(right_y[i]*a2+b2)
-        right_x_pred = np.array(right_y) * a2 + b2
-        #print('right_y')
-        #print(right_y)
-        #print('right_x_pred')
-        #print right_x_pred
+        #     right_x_pred.append(a2*right_y[i]**2+b2*right_y[i]+c2)
+        right_y_np = np.array(right_y)
+        right_x_pred = a2*right_y_np**2 + b2*right_y_np + c2
+        road_right_angle = math.atan(2 * a2 * c2 + b2)
+        road_angle = (road_left_angle + road_right_angle)/2
+        expect_angle = road_angle-math.pi/2#大于零左转，小于零右转
         x_offset = (x_right_base-x_left_base)/2
 
         plt.clf()
