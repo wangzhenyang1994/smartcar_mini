@@ -85,7 +85,8 @@ class rplidarnav:
         a2 = z2[0]
         b2 = z2[1]
         road_right_angle = math.atan(-a2 / b2)
-        expect_angle = (road_left_angle + road_right_angle)/2
+        road_angle = (road_left_angle + road_right_angle)/2
+        expect_angle = road_angle -math.pi
         x_right_base = b2
         right_x_pred = []
         for i in range (0,len(right_y),1):
