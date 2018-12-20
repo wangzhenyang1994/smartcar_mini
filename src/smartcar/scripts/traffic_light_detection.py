@@ -48,7 +48,7 @@ class trafficLightDetector:
         rospy.Subscriber('images', Image, self.callback)
         rospy.init_node('traffic_light_detection', anonymous=True)
         currentpath, _ = os.path.split(os.path.abspath(sys.argv[0]))
-        self.tplpath = os.path.join(currentpath, 'sample.png')
+        self.tplpath = os.path.join(currentpath, 'template/sample.jpg')
 
     def callback(self, imgmsg):
         img = self.cvb.imgmsg_to_cv2(imgmsg)
