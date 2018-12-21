@@ -31,13 +31,13 @@ class rplidarnav:
         #找左右车道分界点
         #扫描180度范围角度10米内的障碍物
         last_dist = 100
-        for i in range(360,480):
+        for i in range(1080,960,-1):
             if msg.ranges[i]<last_dist:
                 last_dist = msg.ranges[i]
             else:
                 continue
-        for i in range (360,1080):
-            if msg.ranges[i]<10:
+        for i in range (1080,360,-1):
+            if msg.ranges[i]<3:
                 current_dist = msg.ranges[i]
                 #两次扫猫距离在1m以上，两个点不在同一侧车道线
                 if math.fabs(last_dist-current_dist)>1 and math.fabs(last_dist-current_dist)<50:
@@ -48,22 +48,35 @@ class rplidarnav:
                     continue
             else:
                 continue
-        #左侧车道线拟合
-        for i in range (360,break_point_index):
-            current_angle = (0 + (i - 360)/4)*math.pi/180 #弧度制
-            left_dist.append(current_dist)
-            left_angle.append(current_angle)
-            if current_angle <= math.pi/2:
-                current_x = -1*current_dist*math.cos(current_angle)
-                current_y = current_dist*math.sin(current_angle)
-                left_x.append(current_x)
-                left_y.append(current_y)
-            if current_angle > math.pi/2:
-                current_angle = math.pi - current_angle
-                current_x = current_dist*math.cos(current_angle)
-                current_y = current_dist*math.sin(current_angle)
-                left_x.append(current_x)
-                left_y.append(current_y)
+        print('break_point')
+        print(break_point_index)
+        #3米内左侧车道线拟合
+        for i in range (1080,break_point_index,-1):
+            #过滤远距离扫描值
+            if msg.ranges[i] < 3 :
+                current_dist = msg.ranges[i]
+                #过滤同一个锥桶的扫描点
+                if math.fabs(left_last_dist - current_dist)>=0.05:
+                    current_angle = (0 + (1080 - i) / 4) * math.pi / 180  # 弧度制
+                    left_dist.append(current_dist)
+                    left_angle.append(current_angle)
+                    left_last_dist = current_dist
+                    if current_angle <= math.pi / 2:
+                        current_x = -1 * current_dist * math.cos(current_angle)
+                        current_y = current_dist * math.sin(current_angle)
+                        left_x.append(current_x)
+                        left_y.append(current_y)
+                    if current_angle > math.pi / 2:
+                        current_angle = math.pi - current_angle
+                        current_x = current_dist * math.cos(current_angle)
+                        current_y = current_dist * math.sin(current_angle)
+                        left_x.append(current_x)
+                        left_y.append(current_y)
+                else:
+                    left_last_dist = current_dist
+            else:
+                continue
+
         z1 = np.polyfit(left_y, left_x, 2)  # 二次拟合
         a1 = z1[0]
         b1 = z1[1]
@@ -74,24 +87,34 @@ class rplidarnav:
         for i in range (0,len(left_y),1):
             left_x_pred.append(a1*left_y[i]**2+b1*left_y[i]+c1)
         #计算切线斜率和道路偏向角
-        road_left_angle = math.atan(2 * a1 * c1 + b1)        
-        #右侧车道拟合
-        for i in range (break_point_index,1080):
-            current_angle = (0 + (1080 - i)/4)*math.pi/180 #弧度制
-            right_dist.append(current_dist)
-            right_angle.append(current_angle)
-            if current_angle <= math.pi/2:
-                current_x = current_dist*math.cos(current_angle)
-                current_y = current_dist*math.sin(current_angle)
-                right_x.append(current_x)
-                right_y.append(current_y)
-            if current_angle > math.pi/2:
-                current_angle = math.pi - current_angle
-                current_x = -1*current_dist*math.cos(current_angle)
-                current_y = current_dist*math.sin(current_angle)               
-                right_x.append(current_x)
-                right_y.append(current_y)
-        z2 = np.polyfit(right_y, right_x, 2)  # 二次拟合
+        road_left_angle = math.atan(-2 * a1 / b1)
+        right_last_dist = 0 #右侧上一点距离值
+        #3米内右侧车道拟合
+        for i in range (360,break_point_index):
+            if msg.ranges[i]<3:
+                current_dist = msg.ranges[i]
+                # 过滤同一个锥桶的扫描点
+                if math.fabs(left_last_dist - current_dist)>=0.05:
+                    current_angle = (0 + (i-360) / 4) * math.pi / 180  # 弧度制
+                    right_dist.append(current_dist)
+                    right_angle.append(current_angle)
+                    right_last_dist = current_dist
+                    if current_angle <= math.pi / 2:
+                        current_x = current_dist * math.cos(current_angle)
+                        current_y = current_dist * math.sin(current_angle)
+                        right_x.append(current_x)
+                        right_y.append(current_y)
+                    if current_angle > math.pi / 2:
+                        current_angle = math.pi - current_angle
+                        current_x = -1 * current_dist * math.cos(current_angle)
+                        current_y = current_dist * math.sin(current_angle)
+                        right_x.append(current_x)
+                        right_y.append(current_y)
+                else:
+                    right_last_dist = current_dist
+            else:
+                continue
+        z2 = np.polyfit(right_y, right_x, 1)  # 二次拟合
         a2 = z2[0]
         b2 = z2[1]
         c2 = z2[2]
@@ -99,7 +122,7 @@ class rplidarnav:
         right_x_pred = []
         for i in range (0,len(right_y),1):
             right_x_pred.append(a2*right_y[i]**2+b2*right_y[i]+c2)
-        road_right_angle = math.atan(2 * a2 * c2 + b2)
+        road_right_angle = math.atan(-2 * a2 / b2)
         #计算道路倾角
         road_angle = (road_left_angle + road_right_angle)/2
         #计算离道路中心的偏移
@@ -107,13 +130,13 @@ class rplidarnav:
         right_near_dist = 0
         left_near = []
         right_near = []
-        for i in range(360,480):
+        for i in range(1080,960):
             if msg.ranges[i]<3:
                 left_near.append(msg.ranges[i])
             else:
                 continue
         left_near_dist = np.min(left_near)
-        for i in range(960,1080):
+        for i in range(360,480):
             if msg.ranges[i]<3:
                 right_near.append(msg.ranges[i])
             else:
@@ -121,9 +144,11 @@ class rplidarnav:
         right_near_dist = np.min(right_near)
         x_offset = (left_near_dist-right_near_dist)/2# 大于零左偏，小于零右偏
         plt.clf()
-        plt.plot(left_x_pred, left_y,color='blue')
-        plt.plot(right_x_pred, right_y,color = 'red')
-        plt.axis('equal')
+        plt.scatter(left_x,left_y,c ='r')
+        plt.scatter(right_x,right_y,c='b')
+        #plt.plot(left_x_pred, left_y,color='blue')
+        #plt.plot(right_x_pred, right_y,color = 'red')
+        #plt.axis('equal')
         plt.show()
         plt.pause(0.01)
         return road_angle,x_offset
@@ -232,7 +257,7 @@ class rplidarnav:
         return expect_angle,x_offset
 
     def callback(self, msg):
-        angle,offset = self.road_detection(msg)
+        angle,offset = self.road_detection_all(msg)
         if self.stop_flag == False:
             print('angle')
             print(angle)
