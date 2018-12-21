@@ -1,6 +1,6 @@
 # smartcar_mini
 ## 说明
-本项目是上海交通大学第一届智慧出行挑战赛的底层驱动文件和实例文件，基于NVIDIA Jetson TX2 构建
+本项目是某小车的底层驱动文件和实例文件，基于NVIDIA Jetson TX2 构建
 ## 模块说明
 ### simple_controller
 简单控制器，对底盘进行开环控制
