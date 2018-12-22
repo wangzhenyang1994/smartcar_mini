@@ -15,8 +15,9 @@
   </node>
   <node pkg="smartcar" name="laneline_detection" type="laneline_detection.py" output="screen"/>
   <node pkg="smartcar" name="obstacle_detection" type="obstacle_detection.py" output="screen"/>
+  <node pkg="smartcar" name="rplidar_detection" type="rplidar_detection_1222.py" output="screen"/>
   <!-- <node pkg="smartcar" name="obstacle_detection_fake" type="obstacle_detection_fake.py" output="screen"/> -->
-  <!-- <node pkg="smartcar" name="traffic_light_detection" type="traffic_light_detection.py" output="screen"/> -->
-  <node pkg="smartcar" name="traffic_light_detection" type="traffic_light_detection_v2.py" output="screen"/>
-  <node pkg="smartcar" name="velocity_decision" type="velocity_decision.py" output="screen"/>
+  <node pkg="smartcar" name="traffic_light_detection" type="traffic_light_detection.py" output="screen"/>
+  <!-- <node pkg="smartcar" name="traffic_light_detection" type="traffic_light_detection_v2.py" output="screen"/> -->
+  <node pkg="smartcar" name="velocity_decision" type="velocity_decision1219.py" output="screen"/>
 </launch>
