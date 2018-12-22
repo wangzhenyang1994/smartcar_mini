@@ -45,18 +45,18 @@ class trafficLightDetector:
         self.has_red_light = Bool()
         self.cvb = CvBridge()
         currentpath, _ = os.path.split(os.path.abspath(sys.argv[0]))
-        self.tplpath = os.path.join(currentpath, 'template/sample.jpg')
-        self.pub = rospy.Publisher('has_red_light', Bool, queue_size=1)
+        self.lightpath = os.path.join(currentpath, 'template/light_sample.jpg')
+        self.lightpub = rospy.Publisher('has_red_light', Bool, queue_size=1)
         rospy.Subscriber('images', Image, self.callback)
         rospy.init_node('traffic_light_detection', anonymous=True)
         
     def callback(self, imgmsg):
         img = self.cvb.imgmsg_to_cv2(imgmsg)
-        tpl =cv.imread(self.tplpath)
-        result, has_red_lights = template_demo(img, tpl)
+        lighttpl =cv.imread(self.lightpath)
+        light_result, has_red_lights = template_demo(img, lighttpl)
         self.has_red_light.data = has_red_lights
-        self.pub.publish(self.has_red_light)
-        cv.imshow("tracffic_light", result)
+        self.lightpub.publish(self.has_red_light)
+        cv.imshow("tracffic_light", light_result)
         cv.waitKey(1)
 
 if __name__ == "__main__":
