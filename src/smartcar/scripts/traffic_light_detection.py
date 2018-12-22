@@ -43,20 +43,29 @@ def template_demo(target,tpl):
 class trafficLightDetector:
     def __init__(self):
         self.has_red_light = Bool()
+        self.has_sign = Bool()
         self.cvb = CvBridge()
         currentpath, _ = os.path.split(os.path.abspath(sys.argv[0]))
         self.lightpath = os.path.join(currentpath, 'template/light_sample.jpg')
+        self.signpath = os.path.join(currentpath, 'template/sign_sample.jpg')
         self.lightpub = rospy.Publisher('has_red_light', Bool, queue_size=1)
+        self.signpub = rospy.Publisher('has_sign', Bool, queue_size=1)
         rospy.Subscriber('images', Image, self.callback)
         rospy.init_node('traffic_light_detection', anonymous=True)
         
     def callback(self, imgmsg):
         img = self.cvb.imgmsg_to_cv2(imgmsg)
         lighttpl =cv.imread(self.lightpath)
+        signtpl = cv.imread(self.signpath)
         light_result, has_red_lights = template_demo(img, lighttpl)
+        sign_result, has_sign = template_demo(img, signtpl)
         self.has_red_light.data = has_red_lights
+        self.has_sign.data = has_sign
         self.lightpub.publish(self.has_red_light)
+        self.signpub.publish(self.has_sign)
         cv.imshow("tracffic_light", light_result)
+        cv.waitKey(1) #不确定要不要加这句
+        cv.imshow("traffic_sign", sign_result)
         cv.waitKey(1)
 
 if __name__ == "__main__":
