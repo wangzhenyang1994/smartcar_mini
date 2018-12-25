@@ -47,7 +47,7 @@ class trafficLightDetector:
         self.cvb = CvBridge()
         currentpath, _ = os.path.split(os.path.abspath(sys.argv[0]))
         self.lightpath = os.path.join(currentpath, 'template/light_sample.jpg')
-        self.signpath = os.path.join(currentpath, 'template/sign_sample.jpg')
+        self.signpath = os.path.join(currentpath, 'template/sign_sample.png')
         self.lightpub = rospy.Publisher('has_red_light', Bool, queue_size=1)
         self.signpub = rospy.Publisher('has_sign', Bool, queue_size=1)
         rospy.Subscriber('images', Image, self.callback)
