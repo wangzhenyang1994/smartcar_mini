@@ -15,6 +15,13 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
+
+
+VX=0.3
+K=1
+L=0.8
+
+
 ## @brief detect the lane lines
 class lanelineDetector():
 
@@ -35,8 +42,9 @@ class lanelineDetector():
         self.pub = rospy.Publisher('lane_vel', Twist, queue_size=1)
         rospy.Subscriber('images', Image, self.callback)
         rospy.init_node('laneline_detection', anonymous=True)
+        self.flag=0
         self.signal = 50
-        self.count = 30 #检测不到车道线的时间限制为3秒
+        #self.count = 30 #检测不到车道线的时间限制为3秒
     
     ## @brief change into binary img
     def threshImg(self, img, thresh = [0, 255]):
@@ -53,10 +61,134 @@ class lanelineDetector():
     def warpImg(self, img):
         warp=cv2.warpPerspective(img, self.M, (img.shape[1],img.shape[0]), flags=cv2.INTER_LINEAR)
         return warp
+
+    def processimg(self, img):
+        upper = 15
+        lower = 718
+        upper_num = 0.1
+        lower_num = 0.1
+        upper_index_sum = 0
+        lower_index_sum = 0
+
+        # ---------------------#
+        thresh=100
+
+        histogram=np.sum(img[(img.shape[0]//10)*9:,:],axis=0)
+        #out_img = np.dstack((img, img, img))
+        #out_img=np.uint8(out_img*255)
+        #out_img=255 * out_img
+        midpoint=histogram.shape[0]//2
+        left_base=np.argmax(histogram[:midpoint])
+        right_base=np.argmax(histogram[midpoint:])+midpoint
+
+
+        #---------------------#
+        upper_avg=640
+
+        for i in range(1280):
+            if (img[upper, i] == 255):
+                upper_num = upper_num + 1
+                upper_index_sum = upper_index_sum + i
+#            if (img[lower, i] == 255):
+#                lower_num = lower_num + 1
+#                lower_index_sum = lower_index_sum + i
+            upper_avg = upper_index_sum / upper_num
+#            lower_avg = lower_index_sum / lower_num
+
+        # ---------------------#
+        target=640
+
+        if (left_base>thresh)&(right_base>thresh):
+            self.flag=0
+        elif ((self.flag==0)or(self.flag==1))and(left_base>thresh)&(right_base<thresh):
+            self.flag=1
+            target = upper_avg + HALFWIDTH
+        elif ((self.flag==0)or(self.flag==2))and(left_base<thresh)&(right_base>thresh):
+            self.flag=2
+            target = upper_avg - HALFWIDTH
+
+        if target>=1280:
+            target=1280
+        elif target<0:
+            target=0
+
+        print('left_base:',left_base)
+        print('right_base:',right_base)
+        print('upper_avg:',upper_avg)
+        print('target:',target)
+        print('self.flag:',self.flag)
+
+
+        el=target-640
+
+        return el
+
+
+
+
+
+    def cal_delta(self,el,VX,K,L):
+        #K ∝ VX
+        return math.degrees(math.atan((2*L*el)/(K*(VX**2))))
+
+    def trans(self,delta):
+        #turn right delta>=0;turn left delta<0
+        return -delta*0.02
+
+
+    def callback(self, imgmsg):
+        img = self.cvb.imgmsg_to_cv2(imgmsg)
+        k = 0
+        ##== Warp
+        binary = self.threshImg(img, self.thresh)
+        warp = self.warpImg(binary)
+        # cv2.imshow('binary', binary)
+        # cv2.imshow('wjjuujju	oyAllWindows()
+        # cv2.imwrite('warp.jpg', warp)
+        el = self.processimg(warp)
+        angle=0
+
         
+        direction='straight'
+        if self.flag==1:
+            direction='rightturn'
+        elif self.flag==2:
+            direction=='leftturn'
+
+       
+        if self.signal > 0:
+            self.signal -= 1
+        ##== publish msg to /cmd_vel
+        if self.signal <= 0:
+            twist = Twist()
+            twist.linear.x = VX
+
+            delta=self.cal_delta(el,VX,K,L)
+            angle=self.trans(delta)
+
+            print('\n\nangle:' + str(angle) + '\nel:' + str(el))
+            twist.angular.z =angle
+            self.pub.publish(twist)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(warp, 'angle = %f(rad)' % angle, (50, 100), font, 1, (255, 0, 0), 2)
+        cv2.putText(warp, (' %.2f m %s of the center' % (np.abs(el), direction)), (50, 150), font, 1, (255, 0, 0),2)
+        cv2.imshow('warp', warp)
+        cv2.waitKey(1)
+
+
+            # rospy.loginfo(Line_Info)
+
+if __name__ == '__main__':
+    try:
+        detector = lanelineDetector()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        cv2.destroyAllWindows()
+
+    """    
     ## @brief fit left and right lines using np.polyfit()
     def fit_lines(self, binary_img, plot=True):
-        thresh_points = 500
         #print 'Fitting lines...'
         histogram=np.sum(binary_img[binary_img.shape[0]//2:,:],axis=0)
         out_img = np.dstack((binary_img, binary_img, binary_img))
@@ -114,11 +246,11 @@ class lanelineDetector():
         if len(leftx) == 0 or len(lefty) == 0 or len(rightx) == 0 or len(righty) == 0:
             return False, [], [], []
         '''
-        if len(leftx) <= thresh_points or len(lefty) <= thresh_points:
+        if len(leftx) == 0 or len(lefty) == 0:
             self.left_turn = True
             print('left***********************************')
             return False, [], [], []
-        if len(rightx) <= thresh_points or len(righty) <= thresh_points:
+        if len(rightx) == 0 or len(righty) == 0:
             self.right_turn = True
             print('right***********************************')
             return False, [], [], []
@@ -195,7 +327,7 @@ class lanelineDetector():
         
     ## @brief calculate the mean curverature
     def cal_curverature(self, img_shape, left_fit, right_fit):
-        #print 'Calculating Curvature...'
+        print 'Calculating Curvature...'
         
         ploty=np.linspace(0, img_shape[0]-1, num=img_shape[0])
         ym_per_pix = 0.77 / 659. # meters per pixel in y dimension
@@ -230,19 +362,18 @@ class lanelineDetector():
         self.angle_array.append(angle)
         print('len')
         print(len(self.xoffset_array))
-        blur_length = 10
         coef = []
-        for j in range(blur_length):
-            coef.append(np.exp(-0.2*j))
+        for j in range(180):
+            coef.append(np.exp(-0.005*j))
 
 
-        if len(self.xoffset_array) <= blur_length:
+        if len(self.xoffset_array) <= 180:
             print('start v1')
             return left_curverad, right_curverad, xoffset, angle
         else:
             print('v2')
-            angle_array_latest = self.angle_array[-blur_length: ]
-            for i in range(blur_length):
+            angle_array_latest = angle_array[-180, -1]
+            for i in range(180):
                 angle_array_latest[i] = angle_array_latest[i] * coef[i]
                 angle_blur = angle_blur + angle_array_latest[i]
             #for i in range(len(self.xoffset_array)-1,len(self.xoffset_array)-180,-1):
@@ -251,131 +382,9 @@ class lanelineDetector():
             #    angle_blur += self.angle_array[i]
                 
 
-            angle_blur = angle_blur/blur_length
+            angle_blur = angle_blur/180
 
             print('angle_blur')
             print(angle_blur)
-            return left_curverad, right_curverad, xoffset, angle_blur
-
-
-    ## @brief warp back into original view
-    def warp_perspective_back(self, img, warped, left_fit, right_fit,Minv):
-        #print 'Warping back...'
-        warp_zero = np.zeros_like(warped).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-        ploty=np.linspace(0, img.shape[0]-1, num=img.shape[0])
-        #print len(ploty)
-        leftx=left_fit[0]*ploty**2+left_fit[1]*ploty+left_fit[2]
-        rightx=right_fit[0]*ploty**2+right_fit[1]*ploty+right_fit[2]
-        pts_left = np.array([np.transpose(np.vstack([leftx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([rightx, ploty])))])
-        pts = np.hstack((pts_left, pts_right))
-        #print pts
-
-        ##== Draw the lane onto the warped blank image
-        cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
-        #cv2.imshow('warp', color_warp)
-
-        ##== Warp the blank back to original image space using inverse perspective matrix (Minv)
-        newwarp = cv2.warpPerspective(color_warp, Minv, (img.shape[1], img.shape[0])) 
-        ##== Combine the result with the original image
-        result = cv2.addWeighted(img, 1, newwarp, 0.3, 0)
-        return result
-
-    def callback(self, imgmsg):
-        img = self.cvb.imgmsg_to_cv2(imgmsg)
-        ##== Warp
-        binary = self.threshImg(img, self.thresh)
-        warp = self.warpImg(binary)
-        #cv2.imshow('binary', binary)
-        #cv2.imshow('warp', warp)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
-        #cv2.imwrite('warp.jpg', warp)
-        if self.count <= 0:#连续3秒检测不到车道线则让车辆停止
-            twist=Twist()
-            twist.linear.x = 0
-            twist.angular.z = 0
-            self.pub.publish(twist)
-
-        ##== Fit
-        if self.signal > 0:
-            ret, left_fit, right_fit, out_img = self.fit_lines(warp, True)
-            if ret == False: 
-                cv2.imshow('laneline', result)
-                #cv2.imshow('laneline', warp)
-                cv2.waitKey(1)  
-                return
-            else:
-                self.left_fit = left_fit
-                self.right_fit = right_fit
-                self.signal -= 1
-        else:
-            ret, left_fit, right_fit, out_img = self.fit_lines(warp, True)
-            # ret, left_fit, right_fit, out_img = self.fit_lines_continous(warp, self.left_fit, self.right_fit, nwindows=9,plot=False)
-            if ret == False:
-                if self.left_turn == True:
-                    print ("we have lost left laneline*********************************!!!!!!")
-                    twist = Twist()
-                    twist.linear.x = 0.20
-                    twist.angular.z = 1
-                    self.pub.publish(twist)
-                if self.right_turn == True:
-                    print ("we have lost right laneline*********************************!!!!!!")
-                    twist = Twist()
-                    twist.linear.x = 0.20
-                    twist.angular.z = -1
-                    self.pub.publish(twist)
-
-                #cv2.imshow('laneline', img)
-                #cv2.waitKey(1)
-                return
-            else:
-                self.left_fit = left_fit
-                self.right_fit = right_fit
-
-        #plt.show()
-        #print left_fit, right_fit
-        
-        ##== Calculate curvature
-        left_curverad, right_curverad, xoffset, angle = self.cal_curverature(img.shape, self.left_fit, self.right_fit)
-        cur = (left_curverad+right_curverad) / 2.0
-
-        ##== Warp back
-        result = self.warp_perspective_back(img, warp, self.left_fit, self.right_fit, detector.invM)
-        
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(result, 'Radius of Curvature = %d(m)' % (cur), (50, 50), font, 1, (255, 0, 0), 2)
-        cv2.putText(result, 'Respective angle = %f(rad)' % angle, (50, 100), font, 1, (255, 0, 0), 2)
-        direction = 'left' if xoffset>0 else 'right'
-        cv2.putText(result, ('Vehicle is at %.2f m %s of the center' % (np.abs(xoffset),direction)), (50, 150), font, 1, (255, 0, 0), 2)
-        
-        #plt.figure(figsize=(10,8))
-        cv2.imshow('laneline', result)
-        cv2.imshow('warp', warp)
-        cv2.waitKey(1)
-        
-        ##== publish msg to /cmd_vel
-        if self.signal <= 0:
-            twist=Twist()
-
-            twist.linear.x = 0.2
-            twist.angular.z = angle * 0.1 - xoffset * 0.8
-            self.pub.publish(twist)
-
-
-
-	        #rospy.loginfo(Line_Info)
-    
-if __name__ == '__main__':
-    try:
-        detector = lanelineDetector()
-        rospy.spin()
-    except rospy.ROSInterruptException:
-        cv2.destroyAllWindows()
-
-
-
-
-
+            return left_curverad, right_curverad, xoffset, angle_blur """
 

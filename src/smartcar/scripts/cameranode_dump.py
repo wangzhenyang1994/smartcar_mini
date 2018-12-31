@@ -7,6 +7,7 @@ import os
 import sys
 import glob
 import numpy as np
+import pickle
 
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -70,6 +71,11 @@ class camera:
 
         ##== calibration
         ret, cameraMatrix, cameraDistortion, rotation, translation = cv2.calibrateCamera(objPoints, imgPoints, gray.shape[::-1], None, None)
+
+        dist_pickle = {}
+        dist_pickle["mtx"] = cameraMatrix
+        dist_pickle["dist"] = cameraDistortion
+        pickle.dump(dist_pickle, open( "calib_pics/wide_dist_pickle.p", "wb" ) )
         
         if cameraMatrix != []:
             self.camMat = cameraMatrix
@@ -100,6 +106,6 @@ if __name__ == '__main__':
     try:
         cam = camera(device, width, height, rates)
         cam.calibrate()
-        cam.spin()
+        #cam.spin()
     except rospy.ROSInterruptException:
         pass
