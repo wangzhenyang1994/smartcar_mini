@@ -40,8 +40,8 @@ class rplidarDetector:
         #print('offset')
        # print(offset * 0.6)
         twist = Twist()
-        twist.linear.x = 0.35
-        twist.angular.z = offset * 0.8
+        twist.linear.x = 0.3
+        twist.angular.z = offset * 1.5
         self.pub.publish(twist)
 
 if __name__ == '__main__':
